@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ClassPing</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+// ▼ Supabase 프로젝트 설정 (Settings → Data API의 Project URL / Settings → API Keys의 Publishable key)
+window.CP_CONFIG = {
+  supabaseUrl: "https://foooliifeasnwlaogbjt.supabase.co",
+  supabaseAnonKey: "sb_publishable_kkqP-TMqDmT2SxiFJTxtJw__xRnLQyo"
+};
+</script>
+</head>
+<body style="margin:0">
+<style>
+:root{
+  --bg:#F3F5F7;--surface:#FFFFFF;--surface2:#E9EDF1;--ink:#17212B;--ink2:#5A6B7B;--line:#D5DCE3;
+  --accent:#0F8B8D;--accent-ink:#FFFFFF;--good:#2E9E6B;--mid:#E0A526;--bad:#D65A4A;--vote-yes:#0F8B8D;--vote-no:#D65A4A;--vote-ab:#8A99A8;
+  --stage:#0E1A26;--stage-ink:#F4F7FA;--stage-dim:#9FB3C6;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F151B;--surface:#18212B;--surface2:#212C38;--ink:#EEF2F6;--ink2:#9DACBB;--line:#2C3947;--accent:#3DB7B9;--accent-ink:#0B1418;
+}}
+:root[data-theme="dark"]{
+  --bg:#0F151B;--surface:#18212B;--surface2:#212C38;--ink:#EEF2F6;--ink2:#9DACBB;--line:#2C3947;--accent:#3DB7B9;--accent-ink:#0B1418;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.55}
+h1,h2,h3,.num{font-family:"IBM Plex Sans KR","Noto Sans KR",sans-serif;text-wrap:balance}
+.num{font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:8px 12px;min-width:44px}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.active{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.danger{color:var(--bad)}
+input,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:16px;padding-block:12px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{margin:0;font-size:20px;letter-spacing:-.01em}
+.brand small{color:var(--ink2)}
+.tag{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--surface2);color:var(--ink2);letter-spacing:.02em;align-self:center}
+.tag.live{background:var(--good);color:#fff}
+.tag.demo{background:var(--mid);color:#1a1a1a}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);margin:0 0 6px}
+.small{font-size:12px;color:var(--ink2)}
+.err{color:var(--bad);font-size:13px;margin:6px 0 0;min-height:1em}
+/* host layout */
+.host{display:grid;grid-template-columns:300px 1fr;gap:16px;align-items:start}
+@media (max-width:860px){.host{grid-template-columns:1fr}.stage{position:static!important;height:auto!important;min-height:520px}.panel{max-height:none!important}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 80px);overflow:auto;position:sticky;top:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.tools button{display:flex;align-items:center;gap:8px;justify-content:flex-start;text-align:left}
+.tools button .k{font-family:"IBM Plex Sans KR";font-size:11px;color:var(--ink2);margin-left:auto;border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.tools button.active .k{color:var(--bg);border-color:var(--bg)}
+.joinbox .code{font-family:"IBM Plex Sans KR";font-size:34px;font-weight:700;letter-spacing:.12em;line-height:1}
+.vol{display:flex;gap:8px;align-items:center;white-space:nowrap}
+.vol input{padding:0}
+/* stage */
+.stage{background:var(--stage);color:var(--stage-ink);border-radius:14px;height:calc(100vh - 80px);min-height:480px;position:sticky;top:12px;overflow:hidden;display:flex;flex-direction:column;overflow-wrap:anywhere}
+.stage a{color:#7FD8DA}
+.stage-head{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;font-size:17px;color:var(--stage-dim);border-bottom:1px solid rgba(255,255,255,.08);gap:12px;flex-wrap:wrap}
+.stage-head b{color:var(--stage-ink)}
+.stage-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;gap:18px;min-height:0}
+.stage-q{font-size:clamp(24px,3vw,36px);font-weight:600;margin:0;max-width:24ch;line-height:1.3}
+.stage-big{font-size:clamp(40px,7vw,96px);font-weight:700;margin:0;line-height:1.05}
+.bars{display:flex;gap:20px;align-items:flex-end;height:min(300px,40vh);width:min(620px,100%)}
+.bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.bar .fill{width:100%;border-radius:10px 10px 4px 4px;transition:height .5s cubic-bezier(.2,.8,.2,1);min-height:4px}
+.bar .n{font-size:34px;font-weight:700;line-height:1}
+.bar .n small{font-size:20px;color:var(--stage-dim);font-weight:500}
+.bar .t{font-size:21px;color:var(--stage-ink)}
+.cloud{position:relative;width:min(820px,100%);flex:1;min-height:240px;max-height:420px}
+.cloud span{position:absolute;white-space:nowrap;font-weight:600;transform:translate(-50%,-50%);transition:all .6s;font-family:"IBM Plex Sans KR"}
+.notice-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:32px 40px;max-width:760px;width:100%}
+.notice-card p{white-space:pre-wrap;font-size:clamp(18px,2vw,26px);margin:0;text-align:left;line-height:1.6}
+.idle-code{font-family:"IBM Plex Sans KR";font-size:clamp(64px,10vw,140px);font-weight:700;letter-spacing:.14em;line-height:1;margin:0}
+.idle-qr{background:#fff;padding:10px;border-radius:12px;width:220px;height:220px;display:flex;align-items:center;justify-content:center}
+.idle-qr img,.idle-qr canvas{width:200px!important;height:200px!important}
+.idle-row{display:flex;gap:40px;align-items:center;flex-wrap:wrap;justify-content:center}
+.hidden-results{font-size:22px;color:var(--stage-dim)}
+#ink{position:absolute;inset:0;touch-action:none;cursor:crosshair;display:none}
+#ink.on{display:block}
+.stage.inking{user-select:none}
+.inktools{position:absolute;right:14px;top:56px;display:none;gap:6px;flex-direction:column}
+.inktools.on{display:flex}
+.inktools button{width:34px;height:34px;min-width:0;padding:0;border-radius:50%;border:2px solid #fff}
+.stage-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-top:1px solid rgba(255,255,255,.08);font-size:15px;color:var(--stage-dim);gap:12px;flex-wrap:wrap}
+.stage-foot b{color:var(--stage-ink)}
+/* student */
+.stu{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.stu .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;overflow-wrap:anywhere}
+.stu .q{font-size:20px;font-weight:600;margin:0 0 16px}
+.choice{display:grid;gap:10px}
+.choice button{padding:18px;font-size:18px;font-weight:600;border-width:2px;border-radius:12px;position:relative}
+.choice button[data-v="1"],.choice button[data-v="yes"]{border-color:var(--good)}
+.choice button[data-v="2"],.choice button[data-v="abstain"]{border-color:var(--mid)}
+.choice button[data-v="3"],.choice button[data-v="no"]{border-color:var(--bad)}
+.choice button.sent{background:var(--ink);color:var(--bg)}
+.choice button.sent::after{content:"✓";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:20px}
+.status{margin:12px 0 0;font-size:13px;color:var(--ink2);text-align:center;min-height:1.2em}
+.banner{background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:8px 14px;font-size:14px;text-align:center;font-weight:500}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chips span{background:var(--surface2);border-radius:999px;padding:2px 10px;font-size:13px}
+.center{text-align:center;color:var(--ink2)}
+.landing{max-width:760px;margin:40px auto;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:640px){.landing{grid-template-columns:1fr}}
+.landing .panel{gap:10px;position:static;max-height:none}
+.landing h2{margin:0;font-size:18px}
+.landing p{margin:0;color:var(--ink2);font-size:14px}
+.row{display:flex;gap:8px}
+.hidden{display:none!important}
+.tl{font-family:"IBM Plex Sans KR";font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><h1>ClassPing</h1><small>강의 인터랙션 리모컨</small></div>
+    <div class="row" id="statusRow"><span class="tag" id="connTag">연결 중…</span><a id="switchLink" class="small" href="#" style="align-self:center"></a></div>
+  </div>
+
+  <section id="viewLanding" class="landing hidden">
+    <div class="panel">
+      <h2>강사로 시작</h2>
+      <p>세션 코드가 만들어지고, 화면공유용 무대(스테이지)와 조작 패널이 열립니다.</p>
+      <button class="primary" id="btnHost">강사 화면 열기</button>
+    </div>
+    <div class="panel">
+      <h2>학생으로 참여</h2>
+      <p>강사가 화면에 띄운 4자리 코드를 입력하세요.</p>
+      <div class="row"><input id="joinCode" aria-label="참여 코드" maxlength="4" placeholder="예: K7PX" autocapitalize="characters" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.2em;font-size:20px"><button class="primary" id="btnJoin" style="min-width:80px">참여</button></div>
+      <p class="err" id="joinErr" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section id="viewHost" class="host hidden">
+    <aside class="panel">
+      <div class="joinbox">
+        <p class="lbl">참여 코드</p>
+        <div class="code num" id="codeText">----</div>
+        <div class="row" style="margin-top:8px"><button id="btnCopy" style="flex:1">🔗 참여 링크 복사</button><button id="btnEnd" class="danger" title="세션 종료 후 새 코드">종료</button></div>
+      </div>
+      <div class="tools">
+        <p class="lbl">피드백</p>
+        <div style="display:grid;gap:6px">
+          <button data-mode="understand">🙋 이해도 체크<span class="k">1</span></button>
+          <button data-mode="vote">⚖️ 찬성 / 반대<span class="k">2</span></button>
+          <button data-mode="cloud">☁️ 워드 클라우드<span class="k">3</span></button>
+          <button id="btnReveal">👁 결과 숨기기<span class="k">R</span></button>
+        </div>
+        <p class="lbl" style="margin-top:12px">질문 / 안내 문구 <span id="qTextMode" style="text-transform:none;letter-spacing:0"></span></p>
+        <textarea id="qText" rows="3" aria-label="질문 또는 안내 문구"></textarea>
+        <button id="btnApplyText" style="margin-top:6px">문구 반영</button>
+      </div>
+      <div class="tools">
+        <p class="lbl">운영</p>
+        <div style="display:grid;gap:6px">
+          <button data-mode="break">☕ 쉬는 시간<span class="k">4</span></button>
+          <div class="grid3"><button data-min="5">5분</button><button data-min="10" class="active">10분</button><button data-min="15">15분</button></div>
+          <button data-mode="lab">🧪 실습 안내<span class="k">5</span></button>
+          <button data-mode="notice">📣 공지<span class="k">6</span></button>
+          <button data-mode="idle">⏸ 대기 화면 (코드·QR)<span class="k">0</span></button>
+        </div>
+      </div>
+      <div class="tools">
+        <p class="lbl">화면 도구</p>
+        <div class="grid2">
+          <button id="btnInk">✏️ 판서<span class="k">P</span></button>
+          <button id="btnBgm">🎵 BGM<span class="k">M</span></button>
+        </div>
+        <div class="grid3" id="bgmPresets" style="margin-top:6px">
+          <button data-bgm="focus" class="active">집중</button><button data-bgm="rest">휴식</button><button data-bgm="lab">실습</button>
+        </div>
+        <label class="small vol" style="margin-top:6px">볼륨 <input type="range" id="vol" aria-label="BGM 볼륨" min="0" max="1" step=".05" value=".35"></label>
+      </div>
+      <button id="btnReset" class="danger small">응답 초기화 (새 라운드)</button>
+    </aside>
+
+    <div class="stage" id="stage">
+      <div class="stage-head"><span id="stageMode">대기</span><span>코드 <b class="num" id="codeText2">----</b> · 참여 <b class="num" id="members">0</b>명</span></div>
+      <div class="stage-body" id="stageBody"></div>
+      <canvas id="ink"></canvas>
+      <div class="inktools" id="inkTools">
+        <button style="background:#FFD166" data-c="#FFD166" title="노랑"></button>
+        <button style="background:#4CC9F0" data-c="#4CC9F0" title="하늘"></button>
+        <button style="background:#F72585" data-c="#F72585" title="핑크"></button>
+        <button style="background:#fff" data-c="#ffffff" title="흰색"></button>
+        <button style="background:#0E1A26;color:#fff" id="inkClear" title="지우기">⌫</button>
+      </div>
+      <div class="stage-foot"><span>응답 <b class="num" id="respCount">0</b></span><span id="clock" class="tl"></span></div>
+    </div>
+  </section>
+
+  <section id="viewStu" class="stu hidden">
+    <div class="banner hidden" id="stuBanner" role="status" aria-live="polite"></div>
+    <div class="card" id="stuCard"></div>
+    <p class="center small">세션 <b id="stuCode"></b> · 응답은 익명으로 집계됩니다</p>
+  </section>
+</div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const LABELS = {understand:'이해도 체크', vote:'찬성 / 반대', cloud:'워드 클라우드', break:'쉬는 시간', lab:'실습 안내', notice:'공지', idle:'대기'};
+const DEFAULT_TEXT = {
+  understand:'지금까지 내용, 어느 정도 이해되셨나요?',
+  vote:'이 방식에 찬성하시나요?',
+  cloud:'오늘 배운 내용 중 가장 기억에 남는 키워드를 한 단어로!',
+  break:'{n}분 후에 다시 시작합니다',
+  lab:'실습 1. 환경 설정\n\n1) 실습 가이드 링크를 열어 1~3단계를 진행합니다\n2) 오류가 나면 채팅에 화면 캡처를 올려 주세요\n3) 완료하면 "이해도 체크"에서 ✅ 눌러 주세요\n\n⏱ 목표 시간 20분',
+  notice:'📣 안내\n\n• 질문은 채팅창에 자유롭게 남겨 주세요\n• 강의 자료는 세션 종료 후 메일로 발송됩니다',
+  idle:'잠시 후 시작합니다'
+};
+const state = {role:null, code:null, room:{mode:'idle', round:'r0', text:'', hidden:false}, texts:{...DEFAULT_TEXT}, responses:[], demo:false, breakMin:10, unsub:[], loaded:false, lastRound:null, lastMode:null, sentWords:[]};
+let deviceId='d'; try{ deviceId=localStorage.getItem('cping_dev')||('d'+Math.random().toString(36).slice(2,10)); localStorage.setItem('cping_dev',deviceId);}catch{}
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const linkify=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
+
+// ================= DATA ADAPTERS =================
+// 공통 인터페이스: connect() -> bool, getRoom, setRoom, onRoom, putResponse, onResponses, heartbeat, onMembers
+const ArtifactAdapter = {
+  db:null,
+  async connect(){ this.db = window.claude?.use ? await window.claude.use('db') : null; return !!this.db; },
+  getRoom:async c=>{ const s=await ArtifactAdapter.db.doc('rooms/'+c).get(); return s.exists? s.data(): null; },
+  setRoom:(c,d)=>ArtifactAdapter.db.doc('rooms/'+c).set(d),
+  onRoom:(c,cb)=>ArtifactAdapter.db.doc('rooms/'+c).onSnapshot(s=>{ if(s.exists) cb(s.data()); }),
+  putResponse:(c,id,r)=>ArtifactAdapter.db.doc(`rooms/${c}/responses/${id}`).set(r),
+  onResponses:(c,cb)=>ArtifactAdapter.db.collection(`rooms/${c}/responses`).onSnapshot(s=>cb(s.docs.map(d=>d.data()))),
+  heartbeat:(c,dev)=>ArtifactAdapter.db.doc(`rooms/${c}/members/${dev}`).set({ts:Date.now()}),
+  onMembers:(c,cb)=>ArtifactAdapter.db.collection(`rooms/${c}/members`).onSnapshot(s=>cb(s.docs.map(d=>d.data().ts||0))),
+};
+const SupabaseAdapter = {
+  sb:null,
+  async connect(){ const cfg=window.CP_CONFIG; if(!cfg?.supabaseUrl) throw new Error('CP_CONFIG 없음'); if(!window.supabase) throw new Error('supabase-js 라이브러리 로드 실패 (CDN 차단?)'); this.sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey); const {error}=await this.sb.from('rooms').select('code').limit(1); if(error) throw new Error('DB 접근 실패: '+error.message); return true; },
+  getRoom:async c=>{ const {data}=await SupabaseAdapter.sb.from('rooms').select('data').eq('code',c).maybeSingle(); return data?.data||null; },
+  setRoom:(c,d)=>SupabaseAdapter.sb.from('rooms').upsert({code:c,data:d,updated_at:new Date().toISOString()}),
+  onRoom(c,cb){ const ch=this.sb.channel('room-'+c).on('postgres_changes',{event:'*',schema:'public',table:'rooms',filter:'code=eq.'+c},p=>cb(p.new.data)).subscribe(); this.getRoom(c).then(d=>d&&cb(d)); return ()=>this.sb.removeChannel(ch); },
+  putResponse:(c,id,r)=>SupabaseAdapter.sb.from('responses').upsert({id,code:c,round:r.round,type:r.type,value:String(r.value),dev:r.dev,ts:r.ts}),
+  onResponses(c,cb){ const fetch=async()=>{ const {data}=await this.sb.from('responses').select('round,type,value,dev,ts').eq('code',c); cb(data||[]); }; const ch=this.sb.channel('resp-'+c).on('postgres_changes',{event:'*',schema:'public',table:'responses',filter:'code=eq.'+c},fetch).subscribe(); fetch(); return ()=>this.sb.removeChannel(ch); },
+  heartbeat:(c,dev)=>SupabaseAdapter.sb.from('members').upsert({code:c,dev,ts:Date.now()}),
+  onMembers(c,cb){ const fetch=async()=>{ const {data}=await this.sb.from('members').select('ts').eq('code',c); cb((data||[]).map(m=>m.ts)); }; const ch=this.sb.channel('mem-'+c).on('postgres_changes',{event:'*',schema:'public',table:'members',filter:'code=eq.'+c},fetch).subscribe(); fetch(); const t=setInterval(fetch,30000); return ()=>{ clearInterval(t); this.sb.removeChannel(ch); }; },
+};
+let A=null; // active adapter
+async function connect(){
+  if(A!==null) return !!A;
+  const cand = window.CP_CONFIG?.supabaseUrl ? SupabaseAdapter : ArtifactAdapter;
+  let ok=false, why=''; try{ ok=await cand.connect(); if(!ok) why='실시간 DB 사용 불가 (공유·로그인 상태 확인)'; }catch(e){ console.warn(e); why=e.message||String(e); }
+  A = ok? cand : false; state.demo=!ok;
+  const t=$('#connTag'); t.title = ok? '' : ('DEMO 원인: '+why); t.onclick = ok? null : ()=>alert('DEMO 모드 원인:\n'+why);
+  if(state.role==='student'){ t.textContent= ok?'● 연결됨':'● 데모'; t.className='tag'; }
+  else { t.textContent= ok?'LIVE · 실시간 공유':'DEMO · 이 화면에서만 동작'; t.className='tag '+(ok?'live':'demo'); }
+  return ok;
+}
+
+// ================= ROUTING =================
+function route(){
+  const h=location.hash.slice(1);
+  if(h.startsWith('join=')) start('student', h.slice(5).toUpperCase());
+  else if(h==='host'){ let c=null; try{c=localStorage.getItem('cping_host')}catch{} start('host', c||genCode()); }
+  else { show('viewLanding'); $('#switchLink').textContent=''; }
+}
+function genCode(){ const a='ABCDEFGHJKMNPQRSTUVWXYZ23456789'; return [...Array(4)].map(()=>a[Math.floor(Math.random()*a.length)]).join(''); }
+function show(id){ ['viewLanding','viewHost','viewStu'].forEach(v=>$('#'+v).classList.toggle('hidden', v!==id)); }
+$('#btnHost').onclick=()=>{ location.hash='host'; };
+$('#btnJoin').onclick=()=>{ const c=$('#joinCode').value.trim().toUpperCase(); if(c.length!==4){ $('#joinErr').textContent='4자리 코드를 입력해 주세요. (숫자 0과 알파벳 O는 쓰이지 않아요)'; return; } $('#joinErr').textContent=''; location.hash='join='+c; };
+$('#joinCode').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#btnJoin').click(); });
+window.addEventListener('hashchange',route);
+
+// ================= SESSION =================
+function roomPatch(patch){
+  state.room={...state.room,...patch,updatedAt:Date.now()};
+  if(A){ A.setRoom(state.code,state.room).catch(e=>console.warn(e)); }
+  renderAll();
+}
+async function sendResponse(type,value){
+  const r={round:state.room.round,type,value,dev:deviceId,ts:Date.now()};
+  if(A){ const id=(type==='cloud'?'c'+Date.now().toString(36)+'_':state.room.round+'_')+deviceId; try{ await A.putResponse(state.code,id,r); }catch(e){ console.warn(e); } }
+  else { if(type!=='cloud') state.responses=state.responses.filter(x=>!(x.round===r.round&&x.type===type&&x.dev===deviceId)); state.responses.push(r); }
+  if(type==='cloud'){ state.sentWords.unshift(String(value)); state.sentWords=state.sentWords.slice(0,6); }
+  renderAll();
+}
+function subscribe(){
+  state.unsub.forEach(u=>u()); state.unsub=[];
+  if(!A) return;
+  state.unsub.push(A.onRoom(state.code,d=>{ state.room={...state.room,...d}; state.loaded=true; renderAll(); }));
+  state.unsub.push(A.onResponses(state.code,list=>{ state.responses=list; renderAll(); }));
+  if(state.role==='host') state.unsub.push(A.onMembers(state.code,tss=>{ const cut=Date.now()-120000; $('#members').textContent=tss.filter(t=>t>cut).length; }));
+}
+async function start(role,code){
+  state.role=role; state.code=code; state.responses=[]; state.loaded=false;
+  await connect();
+  if(role==='host'){
+    try{localStorage.setItem('cping_host',code)}catch{}
+    show('viewHost');
+    $('#codeText').textContent=$('#codeText2').textContent=code;
+    $('#switchLink').textContent='학생 화면 미리보기 ↗'; $('#switchLink').href='#join='+code; $('#switchLink').target='_blank';
+    if(A){ const d=await A.getRoom(code); if(d) state.room={...state.room,...d}; else await A.setRoom(code,{...state.room,createdAt:Date.now()}); state.loaded=true; }
+    else seedDemo();
+    loadTextFor(state.room.mode);
+  } else {
+    show('viewStu'); $('#stuCode').textContent=code; $('#switchLink').textContent='';
+    if(A){
+      $('#stuCard').innerHTML='<p class="center">세션 연결 중…</p>';
+      const d=await A.getRoom(code);
+      if(!d){ $('#stuCard').innerHTML=`<p class="q">코드 <b>${esc(code)}</b> 세션을 찾을 수 없어요</p><p class="small">강사가 아직 세션을 열지 않았거나 코드가 다를 수 있어요. 화면의 코드를 다시 확인해 주세요.</p><div class="row" style="margin-top:12px"><input id="reCode" aria-label="참여 코드" maxlength="4" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:.2em;font-size:20px"><button class="primary" id="reJoin" style="min-width:80px">다시 참여</button></div>`; $('#reJoin').onclick=()=>{ const c=$('#reCode').value.trim().toUpperCase(); if(c.length===4) location.hash='join='+c; }; return; }
+      state.room={...state.room,...d}; state.loaded=true;
+      const hb=()=>A.heartbeat(code,deviceId).catch(()=>{}); hb(); state.unsub.push((()=>{ const t=setInterval(hb,60000); return ()=>clearInterval(t); })());
+    } else { state.loaded=true; }
+    state.lastRound=state.room.round; state.lastMode=state.room.mode;
+  }
+  subscribe(); renderAll();
+}
+function seedDemo(){
+  state.room={mode:'understand',round:'demo',text:DEFAULT_TEXT.understand,hidden:false};
+  const push=(type,vals)=>vals.forEach((v,i)=>state.responses.push({round:'demo',type,value:v,dev:'demo'+i,ts:Date.now()}));
+  push('understand',[1,1,1,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,3,3,3]);
+  push('vote',['yes','yes','yes','yes','yes','yes','yes','no','no','no','abstain']);
+  push('cloud',['Docker','Docker','Docker','컨테이너','컨테이너','컨테이너','컨테이너','이미지','이미지','Kubernetes','Kubernetes','YAML','네트워크','볼륨','볼륨','레이어','Compose','Compose','Compose','포트']);
+  $('#members').textContent='24';
+}
+
+// ================= HOST CONTROLS =================
+function textFor(mode){ return (state.texts[mode]||DEFAULT_TEXT[mode]||'').replace('{n}',state.breakMin); }
+function loadTextFor(mode){ $('#qText').value=textFor(mode); $('#qTextMode').textContent='· '+(LABELS[mode]||''); }
+$$('[data-mode]').forEach(b=>b.onclick=()=>activate(b.dataset.mode));
+function activate(mode){
+  const same = state.room.mode===mode;
+  const patch={mode, text:textFor(mode)};
+  if(['understand','vote','cloud'].includes(mode) && !same) patch.round = state.demo?'demo':'r'+Date.now().toString(36);
+  if(mode==='break' && !same) patch.breakEnd = Date.now()+state.breakMin*60000;
+  if(!same) { ictx.clearRect(0,0,ink.width,ink.height); }
+  loadTextFor(mode);
+  roomPatch(patch);
+}
+$$('[data-min]').forEach(b=>b.onclick=()=>{ state.breakMin=+b.dataset.min; $$('[data-min]').forEach(x=>x.classList.toggle('active',x===b)); if(state.room.mode==='break'){ loadTextFor('break'); roomPatch({breakEnd:Date.now()+state.breakMin*60000,text:textFor('break')}); } else activate('break'); });
+$('#btnApplyText').onclick=()=>{ const t=$('#qText').value.trim(); state.texts[state.room.mode]=t||DEFAULT_TEXT[state.room.mode]; roomPatch({text:t||textFor(state.room.mode)}); };
+$('#btnReveal').onclick=()=>roomPatch({hidden:!state.room.hidden});
+let resetArmed=null;
+$('#btnReset').onclick=()=>{
+  if(!resetArmed){ resetArmed=setTimeout(()=>{ resetArmed=null; $('#btnReset').textContent='응답 초기화 (새 라운드)'; },3000); $('#btnReset').textContent='정말요? 다시 누르면 새 라운드 시작'; return; }
+  clearTimeout(resetArmed); resetArmed=null; $('#btnReset').textContent='응답 초기화 (새 라운드)';
+  if(state.demo) state.responses=state.responses.filter(r=>r.type!==state.room.mode);
+  roomPatch({round:'r'+Date.now().toString(36)});
+};
+$('#btnCopy').onclick=async()=>{ const url=location.origin+location.pathname+'#join='+state.code; try{ await navigator.clipboard.writeText(url); $('#btnCopy').textContent='✓ 복사됨'; }catch{ prompt('참여 링크', url); } setTimeout(()=>$('#btnCopy').textContent='🔗 참여 링크 복사',1500); };
+$('#btnEnd').onclick=()=>{ if(!confirm('세션을 종료하고 새 코드를 만들까요? 학생은 대기 화면을 보게 됩니다.')) return; roomPatch({mode:'idle',text:'오늘 강의가 종료되었습니다. 감사합니다!'}); try{localStorage.removeItem('cping_host')}catch{} state.unsub.forEach(u=>u()); start('host',genCode()); };
+document.addEventListener('keydown',e=>{
+  if(state.role!=='host'||e.ctrlKey||e.metaKey||e.altKey||/INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  const map={'1':'understand','2':'vote','3':'cloud','4':'break','5':'lab','6':'notice','0':'idle'};
+  if(map[e.key]) activate(map[e.key]);
+  const k=e.key.toLowerCase();
+  if(k==='p') $('#btnInk').click(); if(k==='m') $('#btnBgm').click(); if(k==='r') $('#btnReveal').click();
+});
+
+// ================= RENDER =================
+const cur=()=>state.responses.filter(r=>r.round===state.room.round&&r.type===state.room.mode);
+function renderAll(){
+  $$('[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===state.room.mode));
+  $('#btnReveal').innerHTML=(state.room.hidden?'👁 결과 공개':'👁 결과 숨기기')+'<span class="k">R</span>';
+  $('#btnReveal').classList.toggle('active',!!state.room.hidden);
+  if(state.role==='host') renderStage(); else if(state.role==='student') renderStudent();
+  tick();
+}
+function bars(items,total){
+  return `<div class="bars">${items.map(i=>{ const pct=total?Math.round(i.n/total*100):0;
+    return `<div class="bar"><div class="n num">${i.n} <small>${pct}%</small></div><div class="fill" style="height:${Math.max(2,pct)}%;background:${i.c}"></div><div class="t">${i.t}</div></div>`; }).join('')}</div>`;
+}
+function renderStage(){
+  const m=state.room.mode, rs=cur(), body=$('#stageBody');
+  $('#stageMode').textContent=LABELS[m]||m; $('#respCount').textContent=['understand','vote','cloud'].includes(m)?rs.length:'–';
+  const q=`<h2 class="stage-q">${esc(state.room.text)}</h2>`;
+  const hiddenNote=`<p class="hidden-results">결과는 잠시 후 공개됩니다 · 응답 <b class="num" style="color:var(--stage-ink);font-size:40px">${rs.length}</b></p>`;
+  if(m==='understand'){ const c=v=>rs.filter(r=>+r.value===v).length;
+    body.innerHTML=q+(state.room.hidden?hiddenNote:bars([{t:'잘 이해됨',n:c(1),c:'var(--good)'},{t:'애매함',n:c(2),c:'var(--mid)'},{t:'어려움',n:c(3),c:'var(--bad)'}],rs.length));
+  } else if(m==='vote'){ const c=v=>rs.filter(r=>r.value===v).length;
+    body.innerHTML=q+(state.room.hidden?hiddenNote:bars([{t:'찬성',n:c('yes'),c:'var(--vote-yes)'},{t:'반대',n:c('no'),c:'var(--vote-no)'},{t:'기권',n:c('abstain'),c:'var(--vote-ab)'}],rs.length));
+  } else if(m==='cloud'){
+    body.innerHTML=`<h2 class="stage-q" style="font-size:22px;color:var(--stage-dim)">${esc(state.room.text)}</h2>`+(state.room.hidden?hiddenNote:'<div class="cloud" id="cloud"></div>');
+    if(!state.room.hidden) requestAnimationFrame(()=>drawCloud(rs.map(r=>String(r.value))));
+  } else if(m==='break'){
+    body.innerHTML=`<p class="lbl" style="color:var(--stage-dim);font-size:16px">쉬는 시간</p><p class="stage-big num countdown">--:--</p><p style="font-size:24px;color:var(--stage-dim);margin:0">${esc(state.room.text)}</p>`;
+  } else if(m==='lab'||m==='notice'){
+    body.innerHTML=`<div class="notice-card"><p>${linkify(state.room.text)}</p></div>`;
+  } else {
+    const url=location.origin+location.pathname+'#join='+state.code;
+    body.innerHTML=`<p style="font-size:28px;margin:0">${esc(state.room.text||DEFAULT_TEXT.idle)}</p><div class="idle-row"><div><p class="lbl" style="color:var(--stage-dim);font-size:16px">참여 코드</p><p class="idle-code num">${state.code}</p></div><div class="idle-qr" id="idleQr"></div></div><p style="color:var(--stage-dim);font-size:18px;margin:0">QR을 찍거나 채팅의 참여 링크를 눌러 코드를 입력하세요</p>`;
+    if(window.QRCode){ try{ new QRCode($('#idleQr'),{text:url,width:200,height:200,correctLevel:QRCode.CorrectLevel.M}); }catch{ $('#idleQr').textContent='QR 생성 불가'; } }
+    else $('#idleQr').innerHTML='<span style="color:#333;font-size:13px;text-align:center;padding:10px">QR을 만들 수 없어요<br>채팅에 참여 링크를 붙여 주세요</span>';
+  }
+}
+function renderStudent(){
+  if(!state.loaded) return;
+  const m=state.room.mode, card=$('#stuCard'), rs=cur();
+  // 라운드/모드 변경 배너
+  if(state.lastMode!==null && (state.lastMode!==m || state.lastRound!==state.room.round)){
+    const msg = ['understand','vote','cloud'].includes(m)? '새 질문이 열렸어요' : (m==='break'?'쉬는 시간이에요':'강사가 화면을 바꿨어요');
+    const b=$('#stuBanner'); b.textContent=msg; b.classList.remove('hidden'); clearTimeout(b._t); b._t=setTimeout(()=>b.classList.add('hidden'),4000);
+    if(state.lastRound!==state.room.round) state.sentWords=[];
+  }
+  state.lastMode=m; state.lastRound=state.room.round;
+  const mine=rs.find(r=>r.dev===deviceId);
+  const btn=(v,t)=>`<button data-v="${v}" class="${mine&&String(mine.value)===String(v)?'sent':''}">${t}</button>`;
+  const status=(sent)=>`<p class="status" role="status" aria-live="polite">${sent?('응답이 전송됐어요 ✓ 바꾸려면 다시 선택하세요'+(state.room.hidden?' · 결과는 강사가 공개합니다':'')):'하나를 선택하세요'}</p>`;
+  if(m==='understand'){
+    card.innerHTML=`<p class="q">${esc(state.room.text)}</p><div class="choice">${btn(1,'😀 잘 이해됨')}${btn(2,'🤔 애매함')}${btn(3,'😵 어려움')}</div>${status(!!mine)}`;
+  } else if(m==='vote'){
+    card.innerHTML=`<p class="q">${esc(state.room.text)}</p><div class="choice">${btn('yes','👍 찬성')}${btn('no','👎 반대')}${btn('abstain','🤷 기권')}</div>${status(!!mine)}`;
+  } else if(m==='cloud'){
+    card.innerHTML=`<p class="q">${esc(state.room.text)}</p><div class="row"><input id="cloudIn" aria-label="단어 입력" maxlength="20" placeholder="한 단어로 입력 (20자)" autocomplete="off"><button class="primary" id="cloudSend" style="min-width:80px">보내기</button></div><div class="chips" id="chips">${state.sentWords.map(w=>`<span>✓ ${esc(w)}</span>`).join('')}</div><p class="status" role="status" aria-live="polite">${state.sentWords.length?`'${esc(state.sentWords[0])}' 보냈어요. 더 보내도 돼요.`:'여러 번 보낼 수 있어요.'}</p>`;
+    const send=()=>{ const v=$('#cloudIn').value.trim(); if(!v) return; sendResponse('cloud',v); $('#cloudIn').value=''; $('#cloudIn').focus(); };
+    $('#cloudSend').onclick=send; $('#cloudIn').addEventListener('keydown',e=>{ if(e.key==='Enter') send(); });
+  } else if(m==='break'){
+    card.innerHTML=`<p class="lbl">쉬는 시간</p><p class="stage-big num countdown" style="font-size:60px">--:--</p><p class="center">${esc(state.room.text)}</p>`;
+  } else if(m==='lab'||m==='notice'){
+    card.innerHTML=`<p class="lbl">${LABELS[m]}</p><p style="white-space:pre-wrap;font-size:17px;margin:0">${linkify(state.room.text)}</p>`;
+  } else {
+    card.innerHTML=`<p class="center" style="font-size:18px">${esc(state.room.text||DEFAULT_TEXT.idle)}</p><p class="center small">강사가 질문을 열면 이 화면이 바뀝니다.</p>`;
+  }
+  card.querySelectorAll('.choice button').forEach(b=>b.onclick=()=>sendResponse(m,b.dataset.v));
+}
+function drawCloud(words){
+  const el=$('#cloud'); if(!el) return;
+  const freq={}, disp={};
+  words.forEach(w=>{ const k=w.trim().toLowerCase(); if(!k) return; freq[k]=(freq[k]||0)+1; disp[k]=disp[k]||{}; disp[k][w.trim()]=(disp[k][w.trim()]||0)+1; });
+  const list=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,40);
+  const max=list[0]?.[1]||1, W=el.clientWidth||700, H=el.clientHeight||300;
+  const pal=['#FFD166','#4CC9F0','#F4F7FA','#80ED99','#F7A072','#B5A4F5'];
+  const placed=[]; el.innerHTML='';
+  list.forEach(([k,n],i)=>{
+    const label=Object.entries(disp[k]).sort((a,b)=>b[1]-a[1])[0][0];
+    const s=document.createElement('span'); s.textContent=label; s.style.color=pal[i%pal.length]; s.title=n+'회'; el.appendChild(s);
+    let size=22+(n/max)*50, ok=false, x=W/2, y=H/2;
+    for(let attempt=0; attempt<3 && !ok; attempt++, size*=0.75){
+      s.style.fontSize=size+'px'; const bw=s.offsetWidth+8, bh=s.offsetHeight+4; let a=0,r=0;
+      for(let t=0;t<700;t++){ x=W/2+r*Math.cos(a); y=H/2+r*Math.sin(a)*0.6; const box={l:x-bw/2,t:y-bh/2,r:x+bw/2,b:y+bh/2};
+        if(box.l>=0&&box.t>=0&&box.r<=W&&box.b<=H&&!placed.some(p=>!(box.r<p.l||box.l>p.r||box.b<p.t||box.t>p.b))){ ok=true; placed.push(box); break; } a+=0.35; r+=1.6; }
+    }
+    if(!ok){ s.remove(); return; } s.style.left=x+'px'; s.style.top=y+'px';
+  });
+  if(!list.length) el.innerHTML='<p style="color:var(--stage-dim);text-align:center;padding-top:100px;font-size:22px">단어가 들어오면 여기에 나타납니다</p>';
+}
+
+// countdown + clock (+ break end handling)
+let chimed=null;
+function tick(){
+  const cds=$$('.countdown');
+  if(cds.length&&state.room.mode==='break'&&state.room.breakEnd){
+    const d=Math.max(0,state.room.breakEnd-Date.now());
+    const txt = d===0? '시작합니다' : String(Math.floor(d/60000)).padStart(2,'0')+':'+String(Math.floor(d%60000/1000)).padStart(2,'0');
+    cds.forEach(c=>c.textContent=txt);
+    if(state.role==='student' && d>0 && d<=60000 && !$('#stuBanner').textContent.includes('1분')){ const b=$('#stuBanner'); b.textContent='1분 후 강의가 다시 시작돼요'; b.classList.remove('hidden'); }
+    if(state.role==='host' && d===0 && chimed!==state.room.breakEnd){ chimed=state.room.breakEnd; chime(); setTimeout(()=>{ if(state.room.mode==='break') activate('idle'); },3000); }
+  }
+  const k=$('#clock'); if(k) k.textContent=new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+}
+setInterval(tick,500);
+
+// ================= 판서 =================
+const ink=$('#ink'), ictx=ink.getContext('2d'); let inkOn=false, drawing=false, inkColor='#FFD166';
+function fitInk(){ const r=$('#stage').getBoundingClientRect(); const img=ictx.getImageData(0,0,ink.width||1,ink.height||1); ink.width=r.width; ink.height=r.height; ictx.putImageData(img,0,0); }
+$('#btnInk').onclick=()=>{ inkOn=!inkOn; ink.classList.toggle('on',inkOn); $('#inkTools').classList.toggle('on',inkOn); $('#btnInk').classList.toggle('active',inkOn); $('#stage').classList.toggle('inking',inkOn); if(inkOn) fitInk(); };
+$$('#inkTools [data-c]').forEach(b=>b.onclick=()=>inkColor=b.dataset.c);
+$('#inkClear').onclick=()=>ictx.clearRect(0,0,ink.width,ink.height);
+const pos=e=>{ const r=ink.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; };
+ink.addEventListener('pointerdown',e=>{ drawing=true; const [x,y]=pos(e); ictx.beginPath(); ictx.moveTo(x,y); });
+ink.addEventListener('pointermove',e=>{ if(!drawing) return; const [x,y]=pos(e); ictx.lineWidth=e.pressure?2+e.pressure*5:4; ictx.lineCap='round'; ictx.lineJoin='round'; ictx.strokeStyle=inkColor; ictx.lineTo(x,y); ictx.stroke(); });
+['pointerup','pointerleave'].forEach(t=>ink.addEventListener(t,()=>drawing=false));
+window.addEventListener('resize',()=>{ if(inkOn) fitInk(); });
+
+// ================= BGM (WebAudio 생성) =================
+let ac=null, master=null, bgmTimer=null, bgmOn=false, preset='focus';
+const PRESETS={ focus:{root:220,chords:[[0,7,12],[0,5,12],[-2,5,10],[0,7,14]],bpm:44,wave:'sine'}, rest:{root:174.6,chords:[[0,4,7],[-3,4,9],[-5,2,7],[0,4,11]],bpm:36,wave:'triangle'}, lab:{root:261.6,chords:[[0,7,12],[-5,2,7],[-7,0,5],[-3,4,9]],bpm:56,wave:'sine'} };
+function ensureAc(){ if(!ac){ ac=new (window.AudioContext||window.webkitAudioContext)(); master=ac.createGain(); master.gain.value=+$('#vol').value; master.connect(ac.destination); } return ac.resume(); }
+function note(f,t,dur,g,wave){ const o=ac.createOscillator(), e=ac.createGain(); o.type=wave||PRESETS[preset].wave; o.frequency.value=f; e.gain.setValueAtTime(0,t); e.gain.linearRampToValueAtTime(g,t+dur*0.3); e.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(e).connect(master); o.start(t); o.stop(t+dur+0.1); }
+function bgmLoop(){ const p=PRESETS[preset], beat=60/p.bpm, bar=beat*4; let t=ac.currentTime+0.05, i=0; const step=()=>{ const ch=p.chords[i%p.chords.length]; ch.forEach((semi,j)=>note(p.root*Math.pow(2,semi/12)*(j===0?0.5:1),t,bar*1.1,0.12)); note(p.root*Math.pow(2,ch[(i*2)%3]/12)*2,t+beat,beat*0.9,0.05); note(p.root*Math.pow(2,ch[(i+1)%3]/12)*2,t+beat*2.5,beat*0.9,0.04); t+=bar; i++; }; step(); step(); bgmTimer=setInterval(()=>{ while(t<ac.currentTime+bar*2) step(); },bar*500); }
+async function chime(){ try{ await ensureAc(); const t=ac.currentTime; [523.25,659.25,783.99].forEach((f,i)=>note(f,t+i*0.18,0.9,0.2,'sine')); }catch{} }
+$('#btnBgm').onclick=async()=>{ bgmOn=!bgmOn; $('#btnBgm').classList.toggle('active',bgmOn); if(bgmOn){ await ensureAc(); bgmLoop(); } else clearInterval(bgmTimer); };
+$$('#bgmPresets button').forEach(b=>b.onclick=()=>{ preset=b.dataset.bgm; $$('#bgmPresets button').forEach(x=>x.classList.toggle('active',x===b)); if(bgmOn){ clearInterval(bgmTimer); bgmLoop(); } });
+$('#vol').oninput=()=>{ if(master) master.gain.value=+$('#vol').value; };
+
+route();
+})();
+</script>
+
+</body>
+</html>
