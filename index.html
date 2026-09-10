@@ -6,6 +6,8 @@
 <title>ClassPing</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
 window.CP_CONFIG = {
@@ -84,12 +86,29 @@ input,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1p
 .idle-qr img,.idle-qr canvas{width:200px!important;height:200px!important}
 .idle-row{display:flex;gap:40px;align-items:center;flex-wrap:wrap;justify-content:center}
 .hidden-results{font-size:22px;color:var(--stage-dim)}
-#ink{position:absolute;inset:0;touch-action:none;cursor:crosshair;display:none}
-#ink.on{display:block}
-.stage.inking{user-select:none}
-.inktools{position:absolute;right:14px;top:56px;display:none;gap:6px;flex-direction:column}
-.inktools.on{display:flex}
-.inktools button{width:34px;height:34px;min-width:0;padding:0;border-radius:50%;border:2px solid #fff}
+/* board */
+.board{position:absolute;inset:0;display:none;flex-direction:column;background:#1B2430;z-index:5}
+.board.on{display:flex}
+.bbar{display:flex;gap:6px;align-items:center;padding:6px 10px;background:#0B1219;border-bottom:1px solid rgba(255,255,255,.1);flex-wrap:wrap;font-size:13px}
+.bbar .sep{width:1px;height:22px;background:rgba(255,255,255,.15);margin:0 2px}
+.bbar button{min-width:0;padding:4px 8px;font-size:13px;background:transparent;color:#E6EDF5;border-color:transparent;border-radius:6px}
+.bbar button:hover{background:rgba(255,255,255,.1);border-color:transparent}
+.bbar button.active{background:#3DB7B9;color:#0B1418;border-color:#3DB7B9}
+.bbar .sw{width:22px;height:22px;border-radius:50%;padding:0;border:2px solid transparent}
+.bbar .sw.active{border-color:#fff;background:inherit}
+.bbar input[type=range]{width:70px;padding:0}
+.bbar .pg{font-family:"IBM Plex Sans KR";font-variant-numeric:tabular-nums;color:#E6EDF5;min-width:56px;text-align:center}
+.bbar .menu{position:relative}
+.bbar .menu > div{display:none;position:absolute;top:100%;left:0;background:#18212B;border:1px solid #2C3947;border-radius:8px;padding:6px;z-index:9;min-width:200px;flex-direction:column;gap:2px}
+.bbar .menu:hover > div,.bbar .menu:focus-within > div{display:flex}
+.bbar .menu > div button{text-align:left;width:100%}
+.bwrap{flex:1;position:relative;overflow:hidden;touch-action:none}
+.bwrap canvas{position:absolute;left:0;top:0}
+#bInk{cursor:crosshair}
+#bInk.eraser{cursor:cell}#bInk.text{cursor:text}#bInk.laser{cursor:none}
+.laser{position:absolute;width:14px;height:14px;border-radius:50%;background:#FF2D55;box-shadow:0 0 12px 4px rgba(255,45,85,.6);transform:translate(-50%,-50%);pointer-events:none;display:none}
+.bhint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#9FB3C6;text-align:center;font-size:16px;pointer-events:none;width:80%}
+.stage:fullscreen{border-radius:0;height:100vh!important}
 .stage-foot{display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-top:1px solid rgba(255,255,255,.08);font-size:15px;color:var(--stage-dim);gap:12px;flex-wrap:wrap}
 .stage-foot b{color:var(--stage-ink)}
 /* student */
@@ -171,10 +190,12 @@ input,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1p
       <div class="tools">
         <p class="lbl">화면 도구</p>
         <div class="grid2">
-          <button id="btnInk">✏️ 판서<span class="k">P</span></button>
-          <button id="btnBgm">🎵 BGM<span class="k">M</span></button>
+          <button id="btnBoard">🖊 보드 (PDF·칠판)<span class="k">B</span></button>
+          <button id="btnFull">⛶ 전체화면<span class="k">F</span></button>
         </div>
-        <div class="grid3" id="bgmPresets" style="margin-top:6px">
+        <button id="btnBgm" style="display:flex;align-items:center;gap:8px;margin-top:6px;width:100%">🎵 BGM 켜기/끄기<span class="k">M</span></button>
+        <p class="lbl" style="margin-top:8px">BGM 분위기 (BGM이 켜져 있을 때 적용)</p>
+        <div class="grid3" id="bgmPresets">
           <button data-bgm="focus" class="active">집중</button><button data-bgm="rest">휴식</button><button data-bgm="lab">실습</button>
         </div>
         <label class="small vol" style="margin-top:6px">볼륨 <input type="range" id="vol" aria-label="BGM 볼륨" min="0" max="1" step=".05" value=".35"></label>
@@ -185,13 +206,50 @@ input,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1p
     <div class="stage" id="stage">
       <div class="stage-head"><span id="stageMode">대기</span><span>코드 <b class="num" id="codeText2">----</b> · 참여 <b class="num" id="members">0</b>명</span></div>
       <div class="stage-body" id="stageBody"></div>
-      <canvas id="ink"></canvas>
-      <div class="inktools" id="inkTools">
-        <button style="background:#FFD166" data-c="#FFD166" title="노랑"></button>
-        <button style="background:#4CC9F0" data-c="#4CC9F0" title="하늘"></button>
-        <button style="background:#F72585" data-c="#F72585" title="핑크"></button>
-        <button style="background:#fff" data-c="#ffffff" title="흰색"></button>
-        <button style="background:#0E1A26;color:#fff" id="inkClear" title="지우기">⌫</button>
+      <div class="board" id="board">
+        <div class="bbar">
+          <div class="menu"><button>📄 파일 ▾</button><div>
+            <button id="bOpenPdf">PDF 열기…</button>
+            <button id="bOpenImg">이미지(PNG/JPG) 열기…</button>
+            <button id="bOpenProj">판서 프로젝트(.json) 열기…</button>
+            <span class="sep" style="width:100%;height:1px;margin:4px 0"></span>
+            <button id="bSavePng">현재 페이지 PNG 저장</button>
+            <button id="bSaveZip">전체 페이지 PNG (ZIP)</button>
+            <button id="bSaveProj">판서 프로젝트(.json) 저장</button>
+            <span class="sep" style="width:100%;height:1px;margin:4px 0"></span>
+            <button id="bNew" style="color:#F7A072">모두 지우고 새로 시작</button>
+          </div></div>
+          <div class="menu"><button>➕ 페이지 ▾</button><div>
+            <button data-bg="green">🟩 녹색 칠판</button><button data-bg="black">⬛ 검은 보드</button><button data-bg="white">⬜ 흰 보드</button><button data-bg="grid">▦ 격자</button>
+            <span class="sep" style="width:100%;height:1px;margin:4px 0"></span>
+            <button id="bDelPage" style="color:#F7A072">현재 페이지 삭제</button>
+          </div></div>
+          <span class="sep"></span>
+          <button id="bPrev" title="이전 페이지 (←)">◀</button><span class="pg" id="bPg">0 / 0</span><button id="bNext" title="다음 페이지 (→)">▶</button>
+          <span class="sep"></span>
+          <button data-tool="pen" class="active" title="펜">✏️ 펜</button>
+          <button data-tool="hl" title="형광펜">🖍 형광</button>
+          <button data-tool="line" title="직선">╲ 선</button>
+          <button data-tool="rect" title="사각형">▭</button>
+          <button data-tool="ellipse" title="원">◯</button>
+          <button data-tool="text" title="텍스트">A 글자</button>
+          <button data-tool="eraser" title="지우개 (선 단위)">⌫ 지우개</button>
+          <button data-tool="laser" title="레이저 포인터">🔴</button>
+          <span class="sep"></span>
+          <button class="sw active" data-c="#FFD166" style="background:#FFD166" title="노랑"></button>
+          <button class="sw" data-c="#FFFFFF" style="background:#FFFFFF" title="흰색"></button>
+          <button class="sw" data-c="#4CC9F0" style="background:#4CC9F0" title="하늘"></button>
+          <button class="sw" data-c="#80ED99" style="background:#80ED99" title="연두"></button>
+          <button class="sw" data-c="#F72585" style="background:#F72585" title="핑크"></button>
+          <button class="sw" data-c="#111111" style="background:#111111" title="검정"></button>
+          <input type="range" id="bWidth" min="1" max="24" value="4" title="굵기" aria-label="굵기">
+          <span class="sep"></span>
+          <button id="bUndo" title="되돌리기 (Ctrl+Z)">↶</button><button id="bRedo" title="다시하기 (Ctrl+Y)">↷</button><button id="bClear" title="이 페이지 판서 지우기">🧹</button>
+          <span style="flex:1"></span>
+          <button id="bClose" title="보드 닫기 (B / Esc)">✕ 닫기</button>
+        </div>
+        <div class="bwrap" id="bWrap"><canvas id="bBg"></canvas><canvas id="bInk"></canvas><div class="laser" id="bLaser"></div><div class="bhint" id="bHint"></div></div>
+        <input type="file" id="bFilePdf" accept="application/pdf" hidden><input type="file" id="bFileImg" accept="image/*" hidden><input type="file" id="bFileProj" accept="application/json" hidden>
       </div>
       <div class="stage-foot"><span>응답 <b class="num" id="respCount">0</b></span><span id="clock" class="tl"></span></div>
     </div>
@@ -221,7 +279,7 @@ const DEFAULT_TEXT = {
 const state = {role:null, code:null, room:{mode:'idle', round:'r0', text:'', hidden:false}, texts:{...DEFAULT_TEXT}, responses:[], demo:false, breakMin:10, unsub:[], loaded:false, lastRound:null, lastMode:null, sentWords:[]};
 let deviceId='d'; try{ deviceId=localStorage.getItem('cping_dev')||('d'+Math.random().toString(36).slice(2,10)); localStorage.setItem('cping_dev',deviceId);}catch{}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function toast(m){ let t=$('#toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#D65A4A;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;max-width:90vw'; document.body.appendChild(t);} t.textContent=m; t.hidden=false; clearTimeout(t._t); t._t=setTimeout(()=>t.hidden=true,5000); }
+function toast(m,c){ let t=$('#toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#D65A4A;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;max-width:90vw'; document.body.appendChild(t);} t.style.background=c||'#D65A4A'; t.textContent=m; t.hidden=false; clearTimeout(t._t); t._t=setTimeout(()=>t.hidden=true,5000); }
 const linkify=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
 
 // ================= DATA ADAPTERS =================
@@ -338,7 +396,6 @@ function activate(mode){
   const patch={mode, text:textFor(mode)};
   if(['understand','vote','cloud'].includes(mode) && !same) patch.round = state.demo?'demo':'r'+Date.now().toString(36);
   if(mode==='break' && !same) patch.breakEnd = Date.now()+state.breakMin*60000;
-  if(!same) { ictx.clearRect(0,0,ink.width,ink.height); }
   loadTextFor(mode);
   roomPatch(patch);
 }
@@ -355,11 +412,13 @@ $('#btnReset').onclick=()=>{
 $('#btnCopy').onclick=async()=>{ const url=location.origin+location.pathname+'#join='+state.code; try{ await navigator.clipboard.writeText(url); $('#btnCopy').textContent='✓ 복사됨'; }catch{ prompt('참여 링크', url); } setTimeout(()=>$('#btnCopy').textContent='🔗 참여 링크 복사',1500); };
 $('#btnEnd').onclick=()=>{ if(!confirm('세션을 종료하고 새 코드를 만들까요? 학생은 대기 화면을 보게 됩니다.')) return; roomPatch({mode:'idle',text:'오늘 강의가 종료되었습니다. 감사합니다!'}); try{localStorage.removeItem('cping_host')}catch{} state.unsub.forEach(u=>u()); start('host',genCode()); };
 document.addEventListener('keydown',e=>{
-  if(state.role!=='host'||e.ctrlKey||e.metaKey||e.altKey||/INPUT|TEXTAREA/.test(e.target.tagName)) return;
+  if(state.role!=='host'||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if(Board.on){ const kk=e.key.toLowerCase(); if((e.ctrlKey||e.metaKey)&&kk==='z'){ e.preventDefault(); e.shiftKey?Board.redo():Board.undo(); return; } if((e.ctrlKey||e.metaKey)&&kk==='y'){ e.preventDefault(); Board.redo(); return; } if(e.key==='ArrowRight'||e.key==='PageDown'){ Board.go(1); return; } if(e.key==='ArrowLeft'||e.key==='PageUp'){ Board.go(-1); return; } if(e.key==='Escape'){ Board.toggle(false); return; } }
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
   const map={'1':'understand','2':'vote','3':'cloud','4':'break','5':'lab','6':'notice','0':'idle'};
   if(map[e.key]) activate(map[e.key]);
   const k=e.key.toLowerCase();
-  if(k==='p') $('#btnInk').click(); if(k==='m') $('#btnBgm').click(); if(k==='r') $('#btnReveal').click();
+  if(k==='b'||k==='p') $('#btnBoard').click(); if(k==='f') $('#btnFull').click(); if(k==='m') $('#btnBgm').click(); if(k==='r') $('#btnReveal').click();
 });
 
 // ================= RENDER =================
@@ -465,17 +524,130 @@ function tick(){
 }
 setInterval(tick,500);
 
-// ================= 판서 =================
-const ink=$('#ink'), ictx=ink.getContext('2d'); let inkOn=false, drawing=false, inkColor='#FFD166';
-function fitInk(){ const r=$('#stage').getBoundingClientRect(); const img=ictx.getImageData(0,0,ink.width||1,ink.height||1); ink.width=r.width; ink.height=r.height; ictx.putImageData(img,0,0); }
-$('#btnInk').onclick=()=>{ inkOn=!inkOn; ink.classList.toggle('on',inkOn); $('#inkTools').classList.toggle('on',inkOn); $('#btnInk').classList.toggle('active',inkOn); $('#stage').classList.toggle('inking',inkOn); if(inkOn) fitInk(); };
-$$('#inkTools [data-c]').forEach(b=>b.onclick=()=>inkColor=b.dataset.c);
-$('#inkClear').onclick=()=>ictx.clearRect(0,0,ink.width,ink.height);
-const pos=e=>{ const r=ink.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; };
-ink.addEventListener('pointerdown',e=>{ drawing=true; const [x,y]=pos(e); ictx.beginPath(); ictx.moveTo(x,y); });
-ink.addEventListener('pointermove',e=>{ if(!drawing) return; const [x,y]=pos(e); ictx.lineWidth=e.pressure?2+e.pressure*5:4; ictx.lineCap='round'; ictx.lineJoin='round'; ictx.strokeStyle=inkColor; ictx.lineTo(x,y); ictx.stroke(); });
-['pointerup','pointerleave'].forEach(t=>ink.addEventListener(t,()=>drawing=false));
-window.addEventListener('resize',()=>{ if(inkOn) fitInk(); });
+// ================= 보드 (PDF·칠판 판서, 강사 화면 전용) =================
+const Board = (() => {
+  const wrap=$('#bWrap'), bg=$('#bBg'), inkC=$('#bInk'), bctx=bg.getContext('2d'), ictx=inkC.getContext('2d'), laser=$('#bLaser'), hint=$('#bHint');
+  const B={on:false, pages:[], cur:0, tool:'pen', color:'#FFD166', width:4, pdf:null, pdfBytes:null, cache:{}, drawing:null, dirty:false};
+  const BG={green:'#2F5D3A', black:'#101418', white:'#FFFFFF', grid:'#FFFFFF'};
+  const newPage=(bgType,extra={})=>({bg:bgType, strokes:[], redo:[], ...extra});
+  if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  // ---- geometry: 컨텐츠 사각형(페이지 비율 유지) 안에서 0..1 정규화 좌표 사용
+  function pageAspect(p){ if(p.bg==='pdf'&&p.pdfAspect) return p.pdfAspect; if(p.bg==='image'&&p.imgAspect) return p.imgAspect; return 16/9; }
+  function rect(){ const W=wrap.clientWidth, H=wrap.clientHeight, p=B.pages[B.cur]; if(!p) return {x:0,y:0,w:W,h:H}; const a=pageAspect(p); let w=W,h=W/a; if(h>H){ h=H; w=H*a; } return {x:(W-w)/2,y:(H-h)/2,w,h}; }
+  const norm=(e)=>{ const r=rect(), b=wrap.getBoundingClientRect(); return [(e.clientX-b.left-r.x)/r.w,(e.clientY-b.top-r.y)/r.h]; };
+
+  // ---- rendering
+  async function drawBg(){
+    const W=wrap.clientWidth, H=wrap.clientHeight; bg.width=inkC.width=W; bg.height=inkC.height=H;
+    bctx.fillStyle='#1B2430'; bctx.fillRect(0,0,W,H);
+    const p=B.pages[B.cur]; hint.textContent=''; if(!p){ hint.innerHTML='📄 파일 ▾ 에서 PDF를 열거나, ➕ 페이지 ▾ 에서 칠판을 추가하세요'; drawInk(); return; }
+    const r=rect();
+    if(p.bg==='pdf'&&B.pdf){
+      const key=p.pdfPage+'@'+Math.round(r.w);
+      if(!B.cache[key]){ const page=await B.pdf.getPage(p.pdfPage); const vp0=page.getViewport({scale:1}); const scale=Math.min(3,(r.w*devicePixelRatio)/vp0.width); const vp=page.getViewport({scale}); const c=document.createElement('canvas'); c.width=vp.width; c.height=vp.height; await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise; B.cache[key]=c; if(Object.keys(B.cache).length>12) delete B.cache[Object.keys(B.cache)[0]]; }
+      if(B.pages[B.cur]!==p) return; bctx.drawImage(B.cache[key],r.x,r.y,r.w,r.h);
+    } else if(p.bg==='image'&&p.img){
+      if(!p._el){ p._el=new Image(); p._el.src=p.img; await new Promise(res=>p._el.onload=res); } bctx.drawImage(p._el,r.x,r.y,r.w,r.h);
+    } else {
+      bctx.fillStyle=BG[p.bg]||'#fff'; bctx.fillRect(r.x,r.y,r.w,r.h);
+      if(p.bg==='grid'){ bctx.strokeStyle='rgba(0,0,0,.12)'; bctx.lineWidth=1; const step=r.w/32; for(let x=r.x;x<=r.x+r.w+1;x+=step){ bctx.beginPath(); bctx.moveTo(x,r.y); bctx.lineTo(x,r.y+r.h); bctx.stroke(); } for(let y=r.y;y<=r.y+r.h+1;y+=step){ bctx.beginPath(); bctx.moveTo(r.x,y); bctx.lineTo(r.x+r.w,y); bctx.stroke(); } }
+    }
+    drawInk();
+  }
+  function drawStroke(ctx,s,r){
+    const px=([x,y])=>[r.x+x*r.w, r.y+y*r.h]; const lw=s.width*r.w/1000;
+    ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle=s.color; ctx.fillStyle=s.color; ctx.lineWidth=lw;
+    if(s.tool==='hl'){ ctx.globalAlpha=.35; ctx.lineWidth=lw*3; }
+    if(s.tool==='pen'||s.tool==='hl'){ ctx.beginPath(); s.points.forEach((p,i)=>{ const [x,y]=px(p); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); if(s.points.length===1){ const [x,y]=px(s.points[0]); ctx.arc(x,y,lw/2,0,7); ctx.fill(); } ctx.stroke(); }
+    else if(s.tool==='line'){ const [a,b]=[px(s.points[0]),px(s.points[1])]; ctx.beginPath(); ctx.moveTo(...a); ctx.lineTo(...b); ctx.stroke(); }
+    else if(s.tool==='rect'){ const [a,b]=[px(s.points[0]),px(s.points[1])]; ctx.strokeRect(Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.abs(b[0]-a[0]),Math.abs(b[1]-a[1])); }
+    else if(s.tool==='ellipse'){ const [a,b]=[px(s.points[0]),px(s.points[1])]; ctx.beginPath(); ctx.ellipse((a[0]+b[0])/2,(a[1]+b[1])/2,Math.abs(b[0]-a[0])/2,Math.abs(b[1]-a[1])/2,0,0,7); ctx.stroke(); }
+    else if(s.tool==='text'){ const [x,y]=px(s.points[0]); ctx.font=`600 ${Math.max(12,s.width*r.w/120)}px "IBM Plex Sans KR","Noto Sans KR",sans-serif`; ctx.textBaseline='top'; s.text.split('\n').forEach((line,i)=>ctx.fillText(line,x,y+i*s.width*r.w/100)); }
+    ctx.restore();
+  }
+  function drawInk(){ ictx.clearRect(0,0,inkC.width,inkC.height); const p=B.pages[B.cur]; if(!p) return; const r=rect(); p.strokes.forEach(s=>drawStroke(ictx,s,r)); if(B.drawing) drawStroke(ictx,B.drawing,r); }
+  function refresh(){ $('#bPg').textContent=B.pages.length?`${B.cur+1} / ${B.pages.length}`:'0 / 0'; drawBg(); }
+
+  // ---- pointer
+  inkC.addEventListener('pointerdown',e=>{
+    if(!B.pages.length){ addPage('green'); }
+    const [x,y]=norm(e); const p=B.pages[B.cur];
+    if(B.tool==='laser') return;
+    if(B.tool==='eraser'){ eraseAt(x,y); B.drawing={tool:'eraser'}; return; }
+    if(B.tool==='text'){ const t=prompt('표시할 글자를 입력하세요'); if(t&&t.trim()){ commit({tool:'text',color:B.color,width:B.width*3,points:[[x,y]],text:t.trim()}); } return; }
+    B.drawing={tool:B.tool,color:B.color,width:B.width,points:[[x,y],[x,y]]}; inkC.setPointerCapture(e.pointerId);
+  });
+  inkC.addEventListener('pointermove',e=>{
+    const [x,y]=norm(e);
+    if(B.tool==='laser'){ const b=wrap.getBoundingClientRect(); laser.style.display='block'; laser.style.left=(e.clientX-b.left)+'px'; laser.style.top=(e.clientY-b.top)+'px'; return; }
+    if(!B.drawing) return;
+    if(B.drawing.tool==='eraser'){ eraseAt(x,y); return; }
+    if(B.drawing.tool==='pen'||B.drawing.tool==='hl'){ const w=B.drawing.points.at(-1); if(Math.hypot(w[0]-x,w[1]-y)>0.0015) B.drawing.points.push([x,y]); } else B.drawing.points[1]=[x,y];
+    drawInk();
+  });
+  const end=()=>{ if(B.drawing&&B.drawing.tool!=='eraser') commit(B.drawing); B.drawing=null; drawInk(); };
+  inkC.addEventListener('pointerup',end); inkC.addEventListener('pointercancel',end);
+  inkC.addEventListener('pointerleave',()=>{ laser.style.display='none'; });
+  function commit(s){ const p=B.pages[B.cur]; p.strokes.push(s); p.redo=[]; B.dirty=true; drawInk(); }
+  function eraseAt(x,y){ const p=B.pages[B.cur]; const R=0.02; const before=p.strokes.length; p.strokes=p.strokes.filter(s=>!s.points.some(([px,py])=>Math.hypot(px-x,py-y)<R) && !(s.tool==='rect'||s.tool==='ellipse'||s.tool==='line' ? inBox(s,x,y):false)); if(p.strokes.length!==before){ B.dirty=true; drawInk(); } }
+  function inBox(s,x,y){ const [a,b]=s.points; const l=Math.min(a[0],b[0]),r=Math.max(a[0],b[0]),t=Math.min(a[1],b[1]),bt=Math.max(a[1],b[1]); const m=0.015; const near=(v,lo,hi)=>v>=lo-m&&v<=hi+m; return (near(x,l,r)&&(Math.abs(y-t)<m||Math.abs(y-bt)<m))||(near(y,t,bt)&&(Math.abs(x-l)<m||Math.abs(x-r)<m)); }
+
+  // ---- pages
+  function addPage(bgType){ B.pages.splice(B.cur+1,0,newPage(bgType)); B.cur=Math.min(B.cur+1,B.pages.length-1); B.dirty=true; refresh(); }
+  function go(d){ if(!B.pages.length) return; B.cur=Math.max(0,Math.min(B.pages.length-1,B.cur+d)); refresh(); }
+  function undo(){ const p=B.pages[B.cur]; if(p&&p.strokes.length){ p.redo.push(p.strokes.pop()); B.dirty=true; drawInk(); } }
+  function redo(){ const p=B.pages[B.cur]; if(p&&p.redo.length){ p.strokes.push(p.redo.pop()); B.dirty=true; drawInk(); } }
+
+  // ---- files
+  async function openPdf(bytes,name){
+    if(!window.pdfjsLib){ toast('PDF 라이브러리를 불러오지 못했습니다'); return; }
+    B.pdf=await pdfjsLib.getDocument({data:bytes.slice(0)}).promise; B.pdfBytes=bytes; B.pdfName=name||'document.pdf'; B.cache={};
+    const first=await B.pdf.getPage(1); const vp=first.getViewport({scale:1});
+    const pages=[]; for(let i=1;i<=B.pdf.numPages;i++){ const pg=i===1?first:await B.pdf.getPage(i); const v=i===1?vp:pg.getViewport({scale:1}); pages.push(newPage('pdf',{pdfPage:i,pdfAspect:v.width/v.height})); }
+    B.pages=pages.concat(B.pages.filter(p=>p.bg!=='pdf')); B.cur=0; B.dirty=true; refresh(); toast(`PDF ${B.pdf.numPages}페이지를 열었습니다`,'#2E9E6B');
+  }
+  $('#bOpenPdf').onclick=()=>$('#bFilePdf').click();
+  $('#bFilePdf').onchange=async e=>{ const f=e.target.files[0]; if(f) openPdf(new Uint8Array(await f.arrayBuffer()),f.name); e.target.value=''; };
+  $('#bOpenImg').onclick=()=>$('#bFileImg').click();
+  $('#bFileImg').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ const im=new Image(); im.onload=()=>{ B.pages.splice(B.cur+1,0,newPage('image',{img:rd.result,imgAspect:im.width/im.height})); B.cur=B.pages.length===1?0:B.cur+1; B.dirty=true; refresh(); }; im.src=rd.result; }; rd.readAsDataURL(f); e.target.value=''; };
+  function composed(idx){ // 배경+판서 합성 PNG (현재 캔버스 크기 기준)
+    const c=document.createElement('canvas'); c.width=bg.width; c.height=bg.height; const x=c.getContext('2d'); x.drawImage(bg,0,0); x.drawImage(inkC,0,0); return c; }
+  function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1000); }
+  const stamp=()=>new Date().toISOString().slice(0,16).replace(/[-:T]/g,'').replace(/(\d{8})(\d{4})/,'$1-$2');
+  $('#bSavePng').onclick=()=>{ if(!B.pages.length) return; composed().toBlob(b=>download(b,`classping-board-${stamp()}-p${B.cur+1}.png`)); };
+  $('#bSaveZip').onclick=async()=>{ if(!B.pages.length||!window.JSZip){ toast('저장할 페이지가 없거나 ZIP 라이브러리가 없습니다'); return; } const zip=new JSZip(); const keep=B.cur; for(let i=0;i<B.pages.length;i++){ B.cur=i; await drawBg(); const blob=await new Promise(r=>composed().toBlob(r)); zip.file(`page-${String(i+1).padStart(2,'0')}.png`,blob); } B.cur=keep; refresh(); download(await zip.generateAsync({type:'blob'}),`classping-board-${stamp()}.zip`); };
+  $('#bSaveProj').onclick=()=>{ const data={v:1,cur:B.cur,pdfName:B.pdfName||null,pdf:B.pdfBytes?b64(B.pdfBytes):null,pages:B.pages.map(({_el,...p})=>p)}; download(new Blob([JSON.stringify(data)],{type:'application/json'}),`classping-board-${stamp()}.json`); };
+  $('#bOpenProj').onclick=()=>$('#bFileProj').click();
+  $('#bFileProj').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; try{ await loadProj(JSON.parse(await f.text())); toast('프로젝트를 불러왔습니다','#2E9E6B'); }catch(err){ toast('프로젝트 파일을 읽을 수 없습니다'); } e.target.value=''; };
+  async function loadProj(d){ B.pages=(d.pages||[]).map(p=>({...p,redo:p.redo||[]})); B.cur=Math.min(d.cur||0,Math.max(0,B.pages.length-1)); B.pdf=null; B.pdfBytes=null; B.cache={}; if(d.pdf){ B.pdfBytes=unb64(d.pdf); B.pdfName=d.pdfName; if(window.pdfjsLib) B.pdf=await pdfjsLib.getDocument({data:B.pdfBytes.slice(0)}).promise; } B.dirty=true; refresh(); }
+  const b64=u8=>{ let s=''; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); };
+  const unb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  $('#bNew').onclick=()=>{ if(!confirm('모든 페이지와 판서를 지우고 새로 시작할까요?')) return; B.pages=[]; B.cur=0; B.pdf=null; B.pdfBytes=null; B.cache={}; B.dirty=true; refresh(); idbSet(null); };
+  $('#bDelPage').onclick=()=>{ if(!B.pages.length) return; if(!confirm(`페이지 ${B.cur+1}을(를) 삭제할까요?`)) return; B.pages.splice(B.cur,1); B.cur=Math.max(0,Math.min(B.cur,B.pages.length-1)); B.dirty=true; refresh(); };
+  $('#bClear').onclick=()=>{ const p=B.pages[B.cur]; if(p&&p.strokes.length){ p.redo=p.strokes.slice(); p.strokes=[]; B.dirty=true; drawInk(); } };
+
+  // ---- toolbar
+  $$('#board [data-tool]').forEach(b=>b.onclick=()=>{ B.tool=b.dataset.tool; $$('#board [data-tool]').forEach(x=>x.classList.toggle('active',x===b)); inkC.className=B.tool; laser.style.display='none'; });
+  $$('#board .sw').forEach(b=>b.onclick=()=>{ B.color=b.dataset.c; $$('#board .sw').forEach(x=>x.classList.toggle('active',x===b)); });
+  $('#bWidth').oninput=e=>B.width=+e.target.value;
+  $$('#board [data-bg]').forEach(b=>b.onclick=()=>addPage(b.dataset.bg));
+  $('#bPrev').onclick=()=>go(-1); $('#bNext').onclick=()=>go(1); $('#bUndo').onclick=undo; $('#bRedo').onclick=redo;
+  $('#bClose').onclick=()=>toggle(false);
+  function toggle(force){ B.on = force===undefined? !B.on : force; $('#board').classList.toggle('on',B.on); $('#btnBoard').classList.toggle('active',B.on); if(B.on) requestAnimationFrame(refresh); }
+  $('#btnBoard').onclick=()=>toggle();
+  $('#btnFull').onclick=()=>{ const st=$('#stage'); if(document.fullscreenElement) document.exitFullscreen(); else st.requestFullscreen?.(); };
+  new ResizeObserver(()=>{ if(B.on) refresh(); }).observe(wrap);
+
+  // ---- autosave (IndexedDB) : 새로고침·탭 닫힘 대비
+  function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('classping',1); r.onupgradeneeded=()=>r.result.createObjectStore('kv'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  async function idbSet(v){ try{ const db=await idb(); const tx=db.transaction('kv','readwrite'); tx.objectStore('kv').put(v,'board'); }catch{} }
+  async function idbGet(){ try{ const db=await idb(); return await new Promise(res=>{ const q=db.transaction('kv').objectStore('kv').get('board'); q.onsuccess=()=>res(q.result); q.onerror=()=>res(null); }); }catch{ return null; } }
+  setInterval(()=>{ if(!B.dirty) return; B.dirty=false; idbSet({v:1,cur:B.cur,pdfName:B.pdfName||null,pdf:B.pdfBytes||null,pages:B.pages.map(({_el,...p})=>p),ts:Date.now()}); },4000);
+  (async()=>{ if(location.hash!=='#host') return; const d=await idbGet(); if(d&&d.pages?.length){ const when=new Date(d.ts).toLocaleString('ko-KR'); if(confirm(`이전 판서(${d.pages.length}페이지, ${when})가 남아 있습니다. 불러올까요?\n(취소하면 삭제됩니다)`)){ if(d.pdf){ B.pdfBytes=d.pdf; B.pdfName=d.pdfName; if(window.pdfjsLib) B.pdf=await pdfjsLib.getDocument({data:d.pdf.slice(0)}).promise; } B.pages=d.pages.map(p=>({...p,redo:p.redo||[]})); B.cur=d.cur||0; toggle(true); } else idbSet(null); } })();
+
+  return {get on(){return B.on}, go, undo, redo, toggle};
+})();
 
 // ================= BGM (WebAudio 생성) =================
 let ac=null, master=null, bgmTimer=null, bgmOn=false, preset='focus';
