@@ -8,7 +8,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-// ▼ Supabase 프로젝트 설정 (Settings → Data API의 Project URL / Settings → API Keys의 Publishable key)
 window.CP_CONFIG = {
   supabaseUrl: "https://foooliifeasnwlaogbjt.supabase.co",
   supabaseAnonKey: "sb_publishable_kkqP-TMqDmT2SxiFJTxtJw__xRnLQyo"
@@ -222,6 +221,7 @@ const DEFAULT_TEXT = {
 const state = {role:null, code:null, room:{mode:'idle', round:'r0', text:'', hidden:false}, texts:{...DEFAULT_TEXT}, responses:[], demo:false, breakMin:10, unsub:[], loaded:false, lastRound:null, lastMode:null, sentWords:[]};
 let deviceId='d'; try{ deviceId=localStorage.getItem('cping_dev')||('d'+Math.random().toString(36).slice(2,10)); localStorage.setItem('cping_dev',deviceId);}catch{}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toast(m){ let t=$('#toast'); if(!t){ t=document.createElement('div'); t.id='toast'; t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#D65A4A;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;z-index:99;max-width:90vw'; document.body.appendChild(t);} t.textContent=m; t.hidden=false; clearTimeout(t._t); t._t=setTimeout(()=>t.hidden=true,5000); }
 const linkify=s=>esc(s).replace(/(https?:\/\/[^\s<]+)/g,'<a href="$1" target="_blank" rel="noopener">$1</a>');
 
 // ================= DATA ADAPTERS =================
@@ -239,14 +239,16 @@ const ArtifactAdapter = {
 };
 const SupabaseAdapter = {
   sb:null,
-  async connect(){ const cfg=window.CP_CONFIG; if(!cfg?.supabaseUrl) throw new Error('CP_CONFIG 없음'); if(!window.supabase) throw new Error('supabase-js 라이브러리 로드 실패 (CDN 차단?)'); this.sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey); const {error}=await this.sb.from('rooms').select('code').limit(1); if(error) throw new Error('DB 접근 실패: '+error.message); return true; },
-  getRoom:async c=>{ const {data}=await SupabaseAdapter.sb.from('rooms').select('data').eq('code',c).maybeSingle(); return data?.data||null; },
-  setRoom:(c,d)=>SupabaseAdapter.sb.from('rooms').upsert({code:c,data:d,updated_at:new Date().toISOString()}),
-  onRoom(c,cb){ const ch=this.sb.channel('room-'+c).on('postgres_changes',{event:'*',schema:'public',table:'rooms',filter:'code=eq.'+c},p=>cb(p.new.data)).subscribe(); this.getRoom(c).then(d=>d&&cb(d)); return ()=>this.sb.removeChannel(ch); },
-  putResponse:(c,id,r)=>SupabaseAdapter.sb.from('responses').upsert({id,code:c,round:r.round,type:r.type,value:String(r.value),dev:r.dev,ts:r.ts}),
-  onResponses(c,cb){ const fetch=async()=>{ const {data}=await this.sb.from('responses').select('round,type,value,dev,ts').eq('code',c); cb(data||[]); }; const ch=this.sb.channel('resp-'+c).on('postgres_changes',{event:'*',schema:'public',table:'responses',filter:'code=eq.'+c},fetch).subscribe(); fetch(); return ()=>this.sb.removeChannel(ch); },
-  heartbeat:(c,dev)=>SupabaseAdapter.sb.from('members').upsert({code:c,dev,ts:Date.now()}),
-  onMembers(c,cb){ const fetch=async()=>{ const {data}=await this.sb.from('members').select('ts').eq('code',c); cb((data||[]).map(m=>m.ts)); }; const ch=this.sb.channel('mem-'+c).on('postgres_changes',{event:'*',schema:'public',table:'members',filter:'code=eq.'+c},fetch).subscribe(); fetch(); const t=setInterval(fetch,30000); return ()=>{ clearInterval(t); this.sb.removeChannel(ch); }; },
+  // supabase 쿼리는 Promise가 아니라 thenable이므로 항상 await 후 {error}를 검사해 예외로 바꿔준다
+  async q(b){ const {data,error}=await b; if(error) throw new Error(error.message); return data; },
+  async connect(){ const cfg=window.CP_CONFIG; if(!cfg?.supabaseUrl) throw new Error('CP_CONFIG 없음'); if(!window.supabase) throw new Error('supabase-js 라이브러리 로드 실패 (CDN 차단?)'); this.sb=window.supabase.createClient(cfg.supabaseUrl,cfg.supabaseAnonKey); try{ await this.q(this.sb.from('rooms').select('code').limit(1)); }catch(e){ throw new Error('DB 접근 실패: '+e.message); } return true; },
+  async getRoom(c){ const d=await this.q(this.sb.from('rooms').select('data').eq('code',c).maybeSingle()); return d?.data||null; },
+  async setRoom(c,d){ await this.q(this.sb.from('rooms').upsert({code:c,data:d,updated_at:new Date().toISOString()})); },
+  onRoom(c,cb){ const ch=this.sb.channel('room-'+c).on('postgres_changes',{event:'*',schema:'public',table:'rooms',filter:'code=eq.'+c},p=>{ if(p.new?.data) cb(p.new.data); }).subscribe(); this.getRoom(c).then(d=>d&&cb(d)).catch(console.warn); return ()=>this.sb.removeChannel(ch); },
+  async putResponse(c,id,r){ await this.q(this.sb.from('responses').upsert({id,code:c,round:r.round,type:r.type,value:String(r.value),dev:r.dev,ts:r.ts})); },
+  onResponses(c,cb){ const fetch=()=>this.q(this.sb.from('responses').select('round,type,value,dev,ts').eq('code',c)).then(d=>cb(d||[])).catch(console.warn); const ch=this.sb.channel('resp-'+c).on('postgres_changes',{event:'*',schema:'public',table:'responses',filter:'code=eq.'+c},fetch).subscribe(); fetch(); const t=setInterval(fetch,15000); return ()=>{ clearInterval(t); this.sb.removeChannel(ch); }; },
+  async heartbeat(c,dev){ await this.q(this.sb.from('members').upsert({code:c,dev,ts:Date.now()})); },
+  onMembers(c,cb){ const fetch=()=>this.q(this.sb.from('members').select('ts').eq('code',c)).then(d=>cb((d||[]).map(m=>m.ts))).catch(console.warn); const ch=this.sb.channel('mem-'+c).on('postgres_changes',{event:'*',schema:'public',table:'members',filter:'code=eq.'+c},fetch).subscribe(); fetch(); const t=setInterval(fetch,30000); return ()=>{ clearInterval(t); this.sb.removeChannel(ch); }; },
 };
 let A=null; // active adapter
 async function connect(){
@@ -277,12 +279,12 @@ window.addEventListener('hashchange',route);
 // ================= SESSION =================
 function roomPatch(patch){
   state.room={...state.room,...patch,updatedAt:Date.now()};
-  if(A){ A.setRoom(state.code,state.room).catch(e=>console.warn(e)); }
   renderAll();
+  if(A){ Promise.resolve().then(()=>A.setRoom(state.code,state.room)).catch(e=>{ console.warn(e); toast('저장 실패: '+e.message); }); }
 }
 async function sendResponse(type,value){
   const r={round:state.room.round,type,value,dev:deviceId,ts:Date.now()};
-  if(A){ const id=(type==='cloud'?'c'+Date.now().toString(36)+'_':state.room.round+'_')+deviceId; try{ await A.putResponse(state.code,id,r); }catch(e){ console.warn(e); } }
+  if(A){ const id=(type==='cloud'?'c'+Date.now().toString(36)+'_':state.room.round+'_')+deviceId; try{ await A.putResponse(state.code,id,r); }catch(e){ console.warn(e); toast('전송 실패: '+e.message); } }
   else { if(type!=='cloud') state.responses=state.responses.filter(x=>!(x.round===r.round&&x.type===type&&x.dev===deviceId)); state.responses.push(r); }
   if(type==='cloud'){ state.sentWords.unshift(String(value)); state.sentWords=state.sentWords.slice(0,6); }
   renderAll();
@@ -302,14 +304,14 @@ async function start(role,code){
     show('viewHost');
     $('#codeText').textContent=$('#codeText2').textContent=code;
     $('#switchLink').textContent='학생 화면 미리보기 ↗'; $('#switchLink').href='#join='+code; $('#switchLink').target='_blank';
-    if(A){ const d=await A.getRoom(code); if(d) state.room={...state.room,...d}; else await A.setRoom(code,{...state.room,createdAt:Date.now()}); state.loaded=true; }
+    if(A){ try{ const d=await A.getRoom(code); if(d) state.room={...state.room,...d}; else await A.setRoom(code,{...state.room,createdAt:Date.now()}); }catch(e){ console.warn(e); toast('세션 불러오기 실패: '+e.message); } state.loaded=true; }
     else seedDemo();
     loadTextFor(state.room.mode);
   } else {
     show('viewStu'); $('#stuCode').textContent=code; $('#switchLink').textContent='';
     if(A){
       $('#stuCard').innerHTML='<p class="center">세션 연결 중…</p>';
-      const d=await A.getRoom(code);
+      let d=null; try{ d=await A.getRoom(code); }catch(e){ $('#stuCard').innerHTML=`<p class="q">연결 오류</p><p class="small">${esc(e.message)}</p><button class="primary" onclick="location.reload()">다시 시도</button>`; return; }
       if(!d){ $('#stuCard').innerHTML=`<p class="q">코드 <b>${esc(code)}</b> 세션을 찾을 수 없어요</p><p class="small">강사가 아직 세션을 열지 않았거나 코드가 다를 수 있어요. 화면의 코드를 다시 확인해 주세요.</p><div class="row" style="margin-top:12px"><input id="reCode" aria-label="참여 코드" maxlength="4" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase;letter-spacing:.2em;font-size:20px"><button class="primary" id="reJoin" style="min-width:80px">다시 참여</button></div>`; $('#reJoin').onclick=()=>{ const c=$('#reCode').value.trim().toUpperCase(); if(c.length===4) location.hash='join='+c; }; return; }
       state.room={...state.room,...d}; state.loaded=true;
       const hb=()=>A.heartbeat(code,deviceId).catch(()=>{}); hb(); state.unsub.push((()=>{ const t=setInterval(hb,60000); return ()=>clearInterval(t); })());
