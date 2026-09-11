@@ -105,7 +105,7 @@ textarea{resize:vertical;line-height:1.45;font-size:13px}
 /* board */
 .board{position:absolute;inset:0;display:none;flex-direction:column;background:#1B2430;z-index:5}
 .board.on{display:flex}
-.bbar{display:flex;gap:2px;align-items:center;padding:4px 6px;background:#0B1219;border-bottom:1px solid rgba(255,255,255,.1);font-size:12px;overflow-x:auto;white-space:nowrap}
+.bbar{display:flex;gap:2px;align-items:center;padding:4px 6px;background:#0B1219;border-bottom:1px solid rgba(255,255,255,.1);font-size:12px;flex-wrap:wrap;white-space:nowrap;position:relative;z-index:8}
 .bbar .sep{width:1px;height:20px;background:rgba(255,255,255,.15);margin:0 3px;flex:none}
 .bbar button{min-width:0;padding:4px 5px;font-size:12px;background:transparent;color:#E6EDF5;border-color:transparent;border-radius:6px;flex:none}
 .bbar button:hover{background:rgba(255,255,255,.1);border-color:transparent}
@@ -116,7 +116,7 @@ textarea{resize:vertical;line-height:1.45;font-size:13px}
 .bbar input[type=range]{width:54px;padding:0;flex:none}
 .bbar .pg{font-family:"IBM Plex Sans KR";font-variant-numeric:tabular-nums;color:#E6EDF5;min-width:50px;text-align:center;flex:none}
 .menu{position:relative;flex:none}
-.menu > div{display:none;position:absolute;top:100%;right:0;background:#18212B;border:1px solid #2C3947;border-radius:8px;padding:6px;z-index:9;min-width:210px;flex-direction:column;gap:2px;white-space:normal}
+.menu > div{display:none;position:absolute;top:calc(100% + 4px);right:0;box-shadow:0 8px 24px rgba(0,0,0,.4);background:#18212B;border:1px solid #2C3947;border-radius:8px;padding:6px;z-index:9;min-width:210px;flex-direction:column;gap:2px;white-space:normal}
 .menu.open > div{display:flex}
 .menu > div button{text-align:left;width:100%}
 .menu > div .sep{width:100%;height:1px;margin:4px 0}
@@ -124,7 +124,7 @@ textarea{resize:vertical;line-height:1.45;font-size:13px}
 .bwrap canvas{position:absolute;left:0;top:0}
 #bInk{cursor:crosshair}
 #bInk.eraser{cursor:cell}#bInk.text{cursor:text}#bInk.laser{cursor:none}
-.laser{position:absolute;width:14px;height:14px;border-radius:50%;background:#FF2D55;box-shadow:0 0 12px 4px rgba(255,45,85,.6);transform:translate(-50%,-50%);pointer-events:none;display:none}
+.laserdot{position:absolute;width:14px;height:14px;border-radius:50%;background:#FF2D55;box-shadow:0 0 12px 4px rgba(255,45,85,.6);transform:translate(-50%,-50%);pointer-events:none;display:none}
 .bhint{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#9FB3C6;text-align:center;font-size:16px;width:80%;display:flex;flex-direction:column;gap:10px;align-items:center;pointer-events:none}
 .bhint button{pointer-events:auto}
 .bhint button{background:#18212B;color:#E6EDF5;border-color:#2C3947}
@@ -249,7 +249,7 @@ textarea{resize:vertical;line-height:1.45;font-size:13px}
           </div></div>
           <button id="bClose" title="보드 닫기 (B / Esc)">✕</button>
         </div>
-        <div class="bwrap" id="bWrap"><canvas id="bBg"></canvas><canvas id="bInk"></canvas><div class="laser" id="bLaser"></div><div class="bhint" id="bHint"></div></div>
+        <div class="bwrap" id="bWrap"><canvas id="bBg"></canvas><canvas id="bInk"></canvas><div class="laserdot" id="bLaser"></div><div class="bhint" id="bHint"></div></div>
         <input type="file" id="bFilePdf" accept="application/pdf" hidden><input type="file" id="bFileImg" accept="image/*" hidden>
       </div>
       <div class="stage-foot"><span>응답 <b class="num" id="respCount">0</b></span><span id="clock" class="tl"></span></div>
